@@ -13,7 +13,7 @@ typedef struct Queue {
     int max_size;
     Request* array;
 } *Queue;
- 
+
 Queue Q_CreateQueue(int max_size)
 {
     Queue queue = (Queue)malloc(sizeof(*queue));
@@ -26,12 +26,10 @@ Queue Q_CreateQueue(int max_size)
     return queue;
 }
 
-Queue Q_DestroyQueue(int max_size)
+void Q_DestroyQueue(Queue queue)
 {
-    for(int i=head; i<size; i++)
-        free(array[i % max_size]);
+    free(queue->array);
     free(queue);
-    return queue;
 }
  
 int Q_isFull(Queue queue)
