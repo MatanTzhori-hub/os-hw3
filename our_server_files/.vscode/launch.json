@@ -26,8 +26,9 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 },
-                {   "description":"In this mode GDB will be attached to both processes after a call to fork() or vfork().",
-                    "text": "-gdb-set detach-on-fork off",
+                {
+                    "description":  "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set scheduler-locking on",
                     "ignoreFailures": true
                 }
             ],
