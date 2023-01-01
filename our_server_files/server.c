@@ -143,17 +143,17 @@ int main(int argc, char *argv[])
                 }
                 else {
                     int req_to_drop = (wait_queue->size + 1)/ 2;
-                    printf("Current wait queue: ");
-                    Q_print(wait_queue);
-                    printf("Dropping %d requests\n", req_to_drop);
+                    // printf("Current wait queue: ");
+                    // Q_print(wait_queue);
+                    // printf("Dropping %d requests\n", req_to_drop);
                     while(req_to_drop > 0){
                         int index_to_drop = rand() % wait_queue->size;
                         Request request_to_drop = Q_FindByIndex(wait_queue, index_to_drop);
                         Q_PopVal(wait_queue, request_to_drop.connfd);
                         Close(request_to_drop.connfd);
                         req_to_drop--;
-                        printf("Dropped request %d, in index %d\n", request_to_drop.connfd, index_to_drop);
-                        Q_print(wait_queue);
+                        // printf("Dropped request %d, in index %d\n", request_to_drop.connfd, index_to_drop);
+                        // Q_print(wait_queue);
                     }
                 }
                 break;
