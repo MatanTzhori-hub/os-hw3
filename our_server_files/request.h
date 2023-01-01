@@ -3,6 +3,6 @@
 
 #include "utils.h"
 
-void requestHandle(Request* request, ThreadInfo* thread_info);
+void requestHandle(Request request, ThreadInfo* thread_arr, int thread_id);
 
 #endif // __REQUEST_H__

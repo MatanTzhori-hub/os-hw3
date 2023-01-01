@@ -6,7 +6,7 @@
 #include "request.h"
 
 // requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
-void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, Request* request, ThreadInfo* thread_info) 
+void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, Request request, ThreadInfo* thread_arr, int thread_id) 
 {
    char buf[MAXLINE], body[MAXBUF];
 
@@ -27,12 +27,12 @@ void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longm
    printf("%s", buf);
 
    sprintf(buf, "Content-Length: %lu\r\n", strlen(body));
-   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request->arrival.tv_sec, request->arrival.tv_usec);
-   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request->dispatch.tv_sec, request->dispatch.tv_usec);
-   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_info->thread_id);
-   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_info->req_counter);
-   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_info->st_counter);
-   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, thread_info->dyn_counter);
+   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request.arrival.tv_sec, request.arrival.tv_usec);
+   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request.dispatch.tv_sec, request.dispatch.tv_usec);
+   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_id);
+   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_arr[thread_id].req_counter);
+   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_arr[thread_id].st_counter);
+   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, thread_arr[thread_id].dyn_counter);
    Rio_writen(fd, buf, strlen(buf));
    printf("%s", buf);
 
@@ -106,7 +106,7 @@ void requestGetFiletype(char *filename, char *filetype)
       strcpy(filetype, "text/plain");
 }
 
-void requestServeDynamic(int fd, char *filename, char *cgiargs, Request* request, ThreadInfo* thread_info)
+void requestServeDynamic(int fd, char *filename, char *cgiargs, Request request, ThreadInfo* thread_arr, int thread_id)
 {
    char buf[MAXLINE], *emptylist[] = {NULL};
 
@@ -114,27 +114,29 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, Request* request
    // The CGI script has to finish writing out the header.
    sprintf(buf, "HTTP/1.0 200 OK\r\n");
    sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
-   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request->arrival.tv_sec, request->arrival.tv_usec);
-   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request->dispatch.tv_sec, request->dispatch.tv_usec);
-   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_info->thread_id);
-   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_info->req_counter);
-   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_info->st_counter);
-   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n", buf, thread_info->dyn_counter);
+   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request.arrival.tv_sec, request.arrival.tv_usec);
+   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request.dispatch.tv_sec, request.dispatch.tv_usec);
+   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_id);
+   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_arr[thread_id].req_counter);
+   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_arr[thread_id].st_counter);
+   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n", buf, thread_arr[thread_id].dyn_counter);
 
    Rio_writen(fd, buf, strlen(buf));
 
-   if (Fork() == 0) {
+   pid_t pid = Fork();
+
+   if (pid == 0) {
       /* Child process */
       Setenv("QUERY_STRING", cgiargs, 1);
       /* When the CGI process writes to stdout, it will instead go to the socket */
       Dup2(fd, STDOUT_FILENO);
       Execve(filename, emptylist, environ);
    }
-   Wait(NULL);
+   WaitPid(pid, NULL, 0);
 }
 
 
-void requestServeStatic(int fd, char *filename, int filesize, Request* request, ThreadInfo* thread_info) 
+void requestServeStatic(int fd, char *filename, int filesize, Request request, ThreadInfo* thread_arr, int thread_id) 
 {
    int srcfd;
    char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -153,12 +155,12 @@ void requestServeStatic(int fd, char *filename, int filesize, Request* request, 
    sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
    sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
    sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
-   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request->arrival.tv_sec, request->arrival.tv_usec);
-   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request->dispatch.tv_sec, request->dispatch.tv_usec);
-   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_info->thread_id);
-   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_info->req_counter);
-   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_info->st_counter);
-   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, thread_info->dyn_counter);
+   sprintf(buf, "%sStat-Req-Arrival:: %ld.%06ld\r\n", buf, request.arrival.tv_sec, request.arrival.tv_usec);
+   sprintf(buf, "%sStat-Req-Dispatch:: %ld.%06ld\r\n", buf, request.dispatch.tv_sec, request.dispatch.tv_usec);
+   sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, thread_id);
+   sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, thread_arr[thread_id].req_counter);
+   sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, thread_arr[thread_id].st_counter);
+   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, thread_arr[thread_id].dyn_counter);
 
    Rio_writen(fd, buf, strlen(buf));
 
@@ -169,9 +171,11 @@ void requestServeStatic(int fd, char *filename, int filesize, Request* request, 
 }
 
 // handle a request
-void requestHandle(Request* request, ThreadInfo* thread_info)
-{
-   int fd = request->connfd;
+void requestHandle(Request request, ThreadInfo* thread_arr, int thread_id)
+{  
+   thread_arr[thread_id].req_counter++;
+
+   int fd = request.connfd;
 
    int is_static;
    struct stat sbuf;
@@ -186,31 +190,31 @@ void requestHandle(Request* request, ThreadInfo* thread_info)
    printf("%s %s %s\n", method, uri, version);
 
    if (strcasecmp(method, "GET")) {
-      requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method", request, thread_info);
+      requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method", request, thread_arr, thread_id);
       return;
    }
    requestReadhdrs(&rio);
 
    is_static = requestParseURI(uri, filename, cgiargs);
    if (stat(filename, &sbuf) < 0) {
-      requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", request, thread_info);
+      requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", request, thread_arr, thread_id);
       return;
    }
 
    if (is_static) {
       if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", request, thread_info);
+         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", request, thread_arr, thread_id);
          return;
       }
-      thread_info->st_counter++;
-      requestServeStatic(fd, filename, sbuf.st_size, request, thread_info);
+      thread_arr[thread_id].st_counter++;
+      requestServeStatic(fd, filename, sbuf.st_size, request, thread_arr, thread_id);
    } else {
       if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not run this CGI program", request, thread_info);
+         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not run this CGI program", request, thread_arr, thread_id);
          return;
       }
-      thread_info->dyn_counter++;
-      requestServeDynamic(fd, filename, cgiargs, request, thread_info);
+      thread_arr[thread_id].dyn_counter++;
+      requestServeDynamic(fd, filename, cgiargs, request, thread_arr, thread_id);
    }
 }
 

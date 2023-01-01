@@ -2,6 +2,7 @@
 #include "request.h"
 #include "queue.h"
 #include "utils.h"
+#include <sys/types.h>
 
 // 
 // server.c: A very, very simple web server
@@ -39,23 +40,22 @@ void getargs(int *port, int *thread_n, int *req_n, Pol_t *policy, int argc, char
     }
 }
 
-void* thread_main(void* temp){
-    ThreadInfo* thread_info = (ThreadInfo*)temp;
+void* thread_main(void* args){
+    int thread_id = *(int*)args;
 
     while(1){
         pthread_mutex_lock(&mtx);
         while(Q_isEmpty(wait_queue)){
             pthread_cond_wait(&work_cond, &mtx);
         }
-
+        
         Request cur_request = Q_Pop(wait_queue);
-        thread_info->req_counter++;
         gettimeofday(&cur_request.dispatch, NULL);
         timersub(&cur_request.dispatch, &cur_request.arrival, &cur_request.dispatch);
         Q_Insert(exec_queue, cur_request);
         pthread_mutex_unlock(&mtx);
         
-        requestHandle(&cur_request, thread_info);
+        requestHandle(cur_request, threads_arr, thread_id);
         Close(cur_request.connfd);
 
         pthread_mutex_lock(&mtx);
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
     // Create workers threads
     for(int i = 0; i < thread_n; i++){
         threads_arr[i].thread_id = i;
-        pthread_create(&(threads_arr[i].thread), NULL, thread_main, &threads_arr[i]);
+        pthread_create(&(threads_arr[i].thread), NULL, thread_main, &threads_arr[i].thread_id);
     }
 
     listenfd = Open_listenfd(port);
