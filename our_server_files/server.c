@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
                 break;
             
             case BLOCK:
-                while(Q_isFull(wait_queue)){
+                while(wait_queue->size + exec_queue->size >= req_n){
                     pthread_cond_wait(&block_cond, &mtx);
                 }
                 break;
